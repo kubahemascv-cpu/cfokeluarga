@@ -404,6 +404,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--txt);height:100dvh
   </div>
 </div>
 
+<!-- ADD/EDIT TAGIHAN MODAL -->
+<div class="modal-ovl" id="modal-bill">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hd"><div class="modal-title" id="modal-bill-title">Tambah Tagihan</div><button class="modal-close" data-close="modal-bill">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="bill-id">
+      <div class="fg"><label class="flbl">Nama Tagihan</label><input class="finp" id="bill-name" placeholder="HCI 1, BPJS, Wifi, dll..."></div>
+      <div class="form-grid">
+        <div class="fg"><label class="flbl">Nominal (Rp)</label><input class="finp" type="text" inputmode="numeric" id="bill-amount" placeholder="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="this.value=parseInt(this.value.replace(/\./g,'')||0).toLocaleString('id-ID')"></div>
+        <div class="fg"><label class="flbl">Tanggal Jatuh Tempo</label><input class="finp" type="number" id="bill-due" min="1" max="31" placeholder="1–31"></div>
+      </div>
+      <div class="fg"><label class="flbl">Warna Label</label>
+        <div id="bill-color-picker" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+      </div>
+      <button class="btn btn-grn btn-block" onclick="saveBill()">Simpan Tagihan</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── UTILS ─────────────────────────────────────────────
 var fmt=function(n){return'Rp'+Math.round(n||0).toLocaleString('id-ID');};
@@ -446,12 +466,12 @@ var loadDebts=function(){return load(KS.debts,[]);};
 var loadTargets=function(){return load(KS.targets,[]);};
 var loadBudgets=function(){var b=load(KS.budgets,null);return b||DEF_BUDGETS.slice();};
 var loadBills=function(){return load(KS.bills,[
-  {id:'bill_hci1',name:'HCI 1',amount:450000,due_day:5,color:'#C62828'},
-  {id:'bill_hci2',name:'HCI 2',amount:350000,due_day:8,color:'#1565C0'},
-  {id:'bill_kredivo',name:'Kredivo',amount:500000,due_day:10,color:'#6A1B9A'},
-  {id:'bill_bpjs',name:'BPJS',amount:150000,due_day:10,color:'#00695C'},
-  {id:'bill_wifi',name:'Wifi',amount:250000,due_day:15,color:'#E65100'},
-  {id:'bill_listrik',name:'Listrik',amount:300000,due_day:20,color:'#F9A825'},
+  {id:'bill_hci1',name:'HCI 1',amount:450000,due_day:5,color:'#C62828',paid_months:[]},
+  {id:'bill_hci2',name:'HCI 2',amount:350000,due_day:8,color:'#1565C0',paid_months:[]},
+  {id:'bill_kredivo',name:'Kredivo',amount:500000,due_day:10,color:'#6A1B9A',paid_months:[]},
+  {id:'bill_bpjs',name:'BPJS',amount:150000,due_day:10,color:'#00695C',paid_months:[]},
+  {id:'bill_wifi',name:'Wifi',amount:250000,due_day:15,color:'#E65100',paid_months:[]},
+  {id:'bill_listrik',name:'Listrik',amount:300000,due_day:20,color:'#F9A825',paid_months:[]},
 ]);};
 var loadAssets=function(){return load(KS.assets,[]);};
 var loadWish=function(){return load(KS.wishlist,[]);};
@@ -816,43 +836,99 @@ function vTarget(){
 }
 
 // ── KALENDER TAGIHAN ─────────────────────────────────
+var BILL_COLORS=['#C62828','#1565C0','#6A1B9A','#00695C','#E65100','#F9A825','#2E7D32','#37474F'];
+var selBillColor='#C62828';
+
 function vTagihan(){
   var bills=loadBills();
-  var now=new Date(), y=now.getFullYear(), mo=now.getMonth()+1;
+  var month=thisMonth();
+  var now=new Date();
   var today_d=now.getDate();
-  var days=daysInMonth(y,mo);
-  var firstDay=new Date(y,mo-1,1).getDay();
 
-  // Build bill map per day
+  var totalAmt=bills.reduce(function(s,b){return s+b.amount;},0);
+  var paidBills=bills.filter(function(b){return(b.paid_months||[]).includes(month);});
+  var unpaidBills=bills.filter(function(b){return!(b.paid_months||[]).includes(month);});
+  var paidAmt=paidBills.reduce(function(s,b){return s+b.amount;},0);
+  var unpaidAmt=unpaidBills.reduce(function(s,b){return s+b.amount;},0);
+
+  // Summary
+  var h='<div class="saldo-card" style="margin-bottom:12px">'
+    +'<div class="saldo-label">Total Tagihan '+now.toLocaleDateString('id-ID',{month:'long',year:'numeric'})+'</div>'
+    +'<div class="saldo-big">'+fmt(totalAmt)+'</div>'
+    +'<div class="saldo-row">'
+    +'<div class="saldo-item"><div class="saldo-item-label">✅ Sudah Lunas</div><div class="saldo-item-value" style="color:#A5D6A7">'+fmtShort(paidAmt)+'</div></div>'
+    +'<div class="saldo-item"><div class="saldo-item-label">❌ Belum Bayar</div><div class="saldo-item-value" style="color:#FFCDD2">'+fmtShort(unpaidAmt)+'</div></div>'
+    +'<div class="saldo-item"><div class="saldo-item-label">⏳ Sisa</div><div class="saldo-item-value">'+bills.length+' tagihan</div></div>'
+    +'</div></div>';
+
+  // Add bill button
+  h+='<button class="btn btn-grn btn-block" onclick="openAddBill()" style="margin-bottom:14px">＋ Tambah / Kelola Tagihan</button>';
+
+  // Bill cards
+  h+='<span class="slbl">Kewajiban Bulanan</span>';
+  if(!bills.length){
+    h+='<div class="empty"><div class="empty-ico">📅</div><div class="empty-txt">Belum ada tagihan. Tap tombol di atas untuk menambahkan.</div></div>';
+  } else {
+    bills.forEach(function(b){
+      var isPaid=(b.paid_months||[]).includes(month);
+      var diff=b.due_day-today_d;
+      var urgency='';
+      if(!isPaid){
+        if(diff<0) urgency='<span style="color:#C62828;font-weight:700"> · SUDAH LEWAT!</span>';
+        else if(diff===0) urgency='<span style="color:#C62828;font-weight:700"> · HARI INI!</span>';
+        else if(diff<=3) urgency='<span style="color:#E65100;font-weight:600"> · H-'+diff+'</span>';
+        else if(diff<=7) urgency='<span style="color:#F9A825;font-weight:600"> · H-'+diff+'</span>';
+      }
+      h+='<div class="card" style="margin-bottom:8px;border-left:4px solid '+(isPaid?'var(--grn)':b.color||'#C62828')+'">'
+        +'<div class="card-body">'
+        +'<div style="display:flex;align-items:flex-start;gap:10px">'
+        +'<div style="width:11px;height:11px;border-radius:50%;background:'+(isPaid?'var(--grn)':b.color||'#C62828')+'margin-top:4px;flex-shrink:0;margin-top:3px"></div>'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700;'+(isPaid?'text-decoration:line-through;color:var(--mut)':'')+'">'+esc(b.name)+'</div>'
+        +'<div style="font-size:11px;color:var(--mut);margin-top:2px">'+fmt(b.amount)+' · Tgl '+b.due_day+urgency+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:5px">'
+        +'<button onclick="openEditBill(\''+b.id+'\')" style="border:none;background:none;font-size:16px;cursor:pointer;padding:2px">✏️</button>'
+        +'<button onclick="deleteBill(\''+b.id+'\')" style="border:none;background:none;font-size:16px;cursor:pointer;padding:2px">🗑️</button>'
+        +'</div></div>'
+        +'<button class="btn btn-block btn-sm" style="margin-top:10px;'+(isPaid?'background:var(--grn-l);color:var(--grn);border:1.5px solid var(--grn-b)':'background:var(--grn);color:#fff')+'" onclick="toggleBillPaid(\''+b.id+'\')">'
+        +(isPaid?'↩️ Batalkan — Belum Lunas':'✅ Tandai Sudah Lunas')
+        +'</button>'
+        +'</div></div>';
+    });
+  }
+
+  // Calendar
+  var y=now.getFullYear(), mo=now.getMonth();
+  var days=daysInMonth(y,mo+1);
+  var firstDay=new Date(y,mo,1).getDay();
   var billMap={};
-  bills.forEach(function(b){if(b.due_day){billMap[b.due_day]=billMap[b.due_day]||[];billMap[b.due_day].push(b);}});
+  bills.forEach(function(b){
+    if(b.due_day){
+      if(!billMap[b.due_day])billMap[b.due_day]=[];
+      billMap[b.due_day].push({name:b.name,color:b.color,isPaid:(b.paid_months||[]).includes(month)});
+    }
+  });
 
   var dayNames=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
-  var h='<span class="slbl">'+new Date(y,mo-1).toLocaleDateString('id-ID',{month:'long',year:'numeric'})+'</span>'
+  h+='<span class="slbl">Kalender '+now.toLocaleDateString('id-ID',{month:'long',year:'numeric'})+'</span>'
     +'<div class="card"><div class="card-body">'
+    +'<div style="display:flex;gap:14px;margin-bottom:10px;font-size:11px">'
+    +'<span><span style="color:#2E7D32;font-weight:700">●</span> Lunas</span>'
+    +'<span><span style="color:#C62828;font-weight:700">●</span> Belum Bayar</span>'
+    +'</div>'
     +'<div class="cal-grid">'
     +dayNames.map(function(d){return'<div class="cal-hd">'+d+'</div>';}).join('')
     +Array(firstDay).fill('<div></div>').join('');
-  
   for(var day=1;day<=days;day++){
     var isToday=day===today_d;
-    var hasBill=!!billMap[day];
-    var cls='cal-day'+(isToday?' today':'')+(hasBill&&!isToday?' has-bill':'');
-    var dots=hasBill?billMap[day].map(function(b){return'<div class="cal-dot" style="background:'+b.color+'"></div>';}).join(''):'';
-    h+='<div class="'+cls+'">'+day+dots+'</div>';
+    var bList=billMap[day]||[];
+    var cls='cal-day'+(isToday?' today':'');
+    var dots=bList.map(function(b){return'<div class="cal-dot" style="background:'+(b.isPaid?'#2E7D32':b.color||'#C62828')+'"></div>';}).join('');
+    var title=bList.length?bList.map(function(b){return b.name+(b.isPaid?' ✅':' ❌');}).join(', '):'';
+    h+='<div class="'+cls+'" title="'+esc(title)+'">'+day+dots+'</div>';
   }
   h+='</div></div></div>';
-
-  // Bill list
-  h+='<span class="slbl">Tagihan Bulan Ini</span>';
-  bills.forEach(function(b){
-    var due=new Date(y,mo-1,b.due_day);
-    var diff=Math.ceil((due-now)/(1000*60*60*24));
-    var badge=diff<0?'<span class="badge badge-red">Sudah lewat</span>':diff===0?'<span class="badge badge-red">Hari ini!</span>':diff<=3?'<span class="badge badge-red">H-'+diff+'</span>':diff<=7?'<span class="badge badge-gld">H-'+diff+'</span>':'<span class="badge badge-grn">Tgl '+b.due_day+'</span>';
-    h+='<div class="card" style="margin-bottom:8px"><div class="card-body"><div style="display:flex;justify-content:space-between;align-items:center">'
-      +'<div><div style="font-size:12.5px;font-weight:700">'+esc(b.name)+'</div><div style="font-size:11px;color:var(--mut)">'+fmt(b.amount)+'</div></div>'
-      +badge+'</div></div></div>';
-  });
   return h;
 }
 
@@ -1023,6 +1099,86 @@ function renderWishlist(){
       +'<button onclick="deleteWish(\''+w.id+'\')" style="border:none;background:none;color:var(--mut);cursor:pointer;font-size:14px">🗑️</button>'
       +'</div>';
   }).join('');
+}
+
+// ── BILL MANAGEMENT ───────────────────────────────────
+function openAddBill(){
+  document.getElementById('bill-id').value='';
+  document.getElementById('modal-bill-title').textContent='Tambah Tagihan';
+  document.getElementById('bill-name').value='';
+  document.getElementById('bill-amount').value='';
+  document.getElementById('bill-due').value='';
+  selBillColor='#C62828';
+  openModal('modal-bill');
+  renderBillColorPicker();
+}
+
+function openEditBill(id){
+  var bill=loadBills().find(function(b){return b.id===id;});
+  if(!bill)return;
+  document.getElementById('bill-id').value=id;
+  document.getElementById('modal-bill-title').textContent='Edit Tagihan';
+  document.getElementById('bill-name').value=bill.name;
+  document.getElementById('bill-amount').value=fmtI(bill.amount);
+  document.getElementById('bill-due').value=bill.due_day||'';
+  selBillColor=bill.color||'#C62828';
+  openModal('modal-bill');
+  renderBillColorPicker();
+}
+
+function renderBillColorPicker(){
+  var el=document.getElementById('bill-color-picker');
+  if(!el)return;
+  el.innerHTML=BILL_COLORS.map(function(c){
+    var isSelected=selBillColor===c;
+    return'<div onclick="selectBillColor(\''+c+'\')" style="width:30px;height:30px;border-radius:50%;background:'+c+';cursor:pointer;border:3px solid '+(isSelected?'#fff':'transparent')+';box-shadow:'+(isSelected?'0 0 0 2px '+c:'none')+';transition:all .15s"></div>';
+  }).join('');
+}
+
+function selectBillColor(c){
+  selBillColor=c;
+  renderBillColorPicker();
+}
+
+function saveBill(){
+  var name=document.getElementById('bill-name').value.trim();
+  var amount=parseI('bill-amount');
+  var due=parseInt(document.getElementById('bill-due').value)||0;
+  if(!name||!amount){alert('Isi nama dan nominal tagihan!');return;}
+  var bills=loadBills();
+  var existId=document.getElementById('bill-id').value;
+  if(existId){
+    var idx=bills.findIndex(function(b){return b.id===existId;});
+    if(idx>=0){bills[idx].name=name;bills[idx].amount=amount;bills[idx].due_day=due;bills[idx].color=selBillColor;}
+  } else {
+    bills.push({id:uid(),name:name,amount:amount,due_day:due,color:selBillColor,paid_months:[]});
+  }
+  save(KS.bills,bills);closeModal('modal-bill');render();
+}
+
+function deleteBill(id){
+  if(!confirm('Hapus tagihan ini dari daftar?'))return;
+  save(KS.bills,loadBills().filter(function(b){return b.id!==id;}));render();
+}
+
+function toggleBillPaid(id){
+  var bills=loadBills();
+  var bill=bills.find(function(b){return b.id===id;});
+  if(!bill)return;
+  if(!bill.paid_months)bill.paid_months=[];
+  var month=thisMonth();
+  var idx=bill.paid_months.indexOf(month);
+  if(idx>=0){
+    // Batalkan pelunasan
+    bill.paid_months.splice(idx,1);
+  } else {
+    // Tandai lunas + catat otomatis sebagai transaksi pengeluaran
+    bill.paid_months.push(month);
+    var tx=loadTx();
+    tx.push({id:uid(),date:today(),type:'expense',category:bill.name,subcategory:'Tagihan Bulanan',amount:bill.amount,method:'transfer',note:'Bayar tagihan '+bill.name});
+    save(KS.tx,tx);
+  }
+  save(KS.bills,bills);render();
 }
 
 // ── RENDER ────────────────────────────────────────────
