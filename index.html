@@ -1432,6 +1432,50 @@ document.addEventListener('input',function(e){
   }catch(e){}
 })();
 
+// ── SERVICE WORKER ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+
+      // Deteksi ada update SW baru
+      reg.addEventListener('updatefound', function() {
+        var newSW = reg.installing;
+        newSW.addEventListener('statechange', function() {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            // Ada versi baru — tampilkan banner hijau
+            showSWBanner(newSW);
+          }
+        });
+      });
+
+      // Kalau SW sudah terpasang sebelumnya, langsung cek update
+      if (reg.waiting) showSWBanner(reg.waiting);
+
+    }).catch(function(err) {
+      console.warn('SW registration failed:', err);
+    });
+
+    // Reload otomatis setelah SW baru aktif
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+  });
+}
+
+function showSWBanner(newSW) {
+  var bar  = document.getElementById('alert-bar');
+  var text = document.getElementById('alert-text');
+  if (!bar || !text) return;
+  bar.style.cssText = 'display:flex;background:linear-gradient(90deg,#1B5E20,#2E7D32);cursor:pointer';
+  text.textContent  = '🔄 Versi baru tersedia — tap di sini untuk memperbarui';
+  bar.onclick = function() {
+    newSW.postMessage({ type: 'SKIP_WAITING' });
+    bar.style.background = 'linear-gradient(90deg,#E65100,#EF6C00)';
+    text.textContent = '⏳ Memperbarui app...';
+  };
+}
+
 // ── INIT ──────────────────────────────────────────────
 // Set default tx date
 document.getElementById('tx-date').value=today();
