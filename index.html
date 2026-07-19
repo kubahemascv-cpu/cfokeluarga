@@ -311,8 +311,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--txt);height:100dvh
       </div>
       <div class="fg"><label class="flbl">Tanggal</label><input class="finp" type="date" id="tx-date"></div>
       <div class="form-grid">
-        <div class="fg"><label class="flbl">Kategori</label><select class="fsel" id="tx-cat"></select></div>
+        <div class="fg"><label class="flbl">Budget / Pos Pengeluaran</label><select class="fsel" id="tx-cat"></select></div>
         <div class="fg"><label class="flbl">Nominal</label><input class="finp" type="number" id="tx-amount" placeholder="0" inputmode="numeric"></div>
+      </div>
+      <div id="tx-budget-hint" style="font-size:10.5px;color:var(--grn-d);background:var(--grn-l);border-radius:7px;padding:6px 10px;margin-bottom:10px;display:none">
+        ✅ Akan masuk ke progress budget <strong id="tx-budget-name"></strong>
       </div>
       <div class="form-grid">
         <div class="fg"><label class="flbl">Metode</label><select class="fsel" id="tx-method"><option value="cash">Cash</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="kredit">Kredit</option></select></div>
@@ -358,19 +361,62 @@ body{font-family:var(--font);background:var(--bg);color:var(--txt);height:100dvh
   </div>
 </div>
 
-<!-- ADD TARGET MODAL -->
+<!-- MODAL TAMBAH/EDIT ASET -->
+<div class="modal-ovl" id="modal-asset">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hd"><div class="modal-title" id="modal-asset-title">Tambah Aset</div><button class="modal-close" data-close="modal-asset">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="asset-id">
+      <div class="fg"><label class="flbl">Nama Aset</label><input class="finp" id="asset-name" placeholder="MacBook, Motor, Emas 10gr, dll..."></div>
+      <div class="form-grid">
+        <div class="fg"><label class="flbl">Kategori</label>
+          <select class="fsel" id="asset-cat">
+            <option value="Elektronik">Elektronik</option>
+            <option value="Kendaraan">Kendaraan</option>
+            <option value="Emas">Emas</option>
+            <option value="Tabungan">Tabungan</option>
+            <option value="Properti">Properti</option>
+            <option value="Investasi">Investasi</option>
+            <option value="Lain-lain">Lain-lain</option>
+          </select>
+        </div>
+        <div class="fg"><label class="flbl">Nilai (Rp)</label><input class="finp" type="text" inputmode="numeric" id="asset-value" placeholder="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="this.value=parseInt(this.value.replace(/\./g,'')||0).toLocaleString('id-ID')"></div>
+      </div>
+      <button class="btn btn-grn btn-block" onclick="saveAsset()">Simpan Aset</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL JUAL / LIKUIDASI ASET -->
+<div class="modal-ovl" id="modal-jual">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hd"><div class="modal-title" id="modal-jual-title">Jual Aset</div><button class="modal-close" data-close="modal-jual">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="jual-asset-id">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:12px;line-height:1.6">Aset akan <strong>dihapus dari daftar</strong> dan harga jual otomatis tercatat sebagai <strong>pemasukan</strong> di tab Kas.</div>
+      <div class="fg"><label class="flbl">Harga Jual (Rp)</label><input class="finp" type="text" inputmode="numeric" id="jual-amount" placeholder="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="this.value=parseInt(this.value.replace(/\./g,'')||0).toLocaleString('id-ID')"></div>
+      <div class="fg"><label class="flbl">Catatan</label><input class="finp" id="jual-note" placeholder="Dijual ke siapa / lewat apa..."></div>
+      <button class="btn btn-gld btn-block" onclick="execJualAset()">💰 Catat Penjualan & Hapus Aset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TARGET MODAL (updated: support edit) -->
 <div class="modal-ovl" id="modal-target">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-hd"><div class="modal-title">Tambah Target</div><button class="modal-close" data-close="modal-target">×</button></div>
+    <div class="modal-hd"><div class="modal-title" id="modal-tgt-title">Tambah Target</div><button class="modal-close" data-close="modal-target">×</button></div>
     <div class="modal-body">
+      <input type="hidden" id="tgt-id">
       <div class="fg"><label class="flbl">Nama Target</label><input class="finp" id="tgt-name" placeholder="Dana Mudik, Dana Sunat, dll..."></div>
       <div class="form-grid">
-        <div class="fg"><label class="flbl">Target (Rp)</label><input class="finp" type="number" id="tgt-target" placeholder="0" inputmode="numeric"></div>
-        <div class="fg"><label class="flbl">Terkumpul (Rp)</label><input class="finp" type="number" id="tgt-saved" placeholder="0" inputmode="numeric"></div>
+        <div class="fg"><label class="flbl">Target (Rp)</label><input class="finp" type="text" inputmode="numeric" id="tgt-target" placeholder="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="this.value=parseInt(this.value.replace(/\./g,'')||0).toLocaleString('id-ID')"></div>
+        <div class="fg"><label class="flbl">Terkumpul (Rp)</label><input class="finp" type="text" inputmode="numeric" id="tgt-saved" placeholder="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="this.value=parseInt(this.value.replace(/\./g,'')||0).toLocaleString('id-ID')"></div>
       </div>
       <div class="fg"><label class="flbl">Deadline</label><input class="finp" type="date" id="tgt-deadline"></div>
-      <button class="btn btn-grn btn-block" onclick="saveTarget()">Simpan</button>
+      <button class="btn btn-grn btn-block" onclick="saveTarget()">Simpan Target</button>
     </div>
   </div>
 </div>
@@ -652,13 +698,21 @@ function vDashboard(){
     return '<div class="score-item"><div class="dot" style="background:'+(d.ok?'#2E7D32':'#C62828')+'"></div>'+esc(d.lbl)+'</div>';
   }).join('');
 
+  var assets=loadAssets();
+  var totalAsset=assets.reduce(function(s,a){return s+(a.value||0);},0);
+  var netWorth=saldo.total+totalAsset-debt;
+
   var h='<div class="saldo-card">'
-    +'<div class="saldo-label">Total Saldo</div>'
+    +'<div class="saldo-label">Total Saldo Tunai</div>'
     +'<div class="saldo-big">'+fmt(saldo.total)+'</div>'
     +'<div class="saldo-row">'
     +'<div class="saldo-item"><div class="saldo-item-label">Cash</div><div class="saldo-item-value">'+fmtShort(saldo.cash)+'</div></div>'
     +'<div class="saldo-item"><div class="saldo-item-label">Bank</div><div class="saldo-item-value">'+fmtShort(saldo.bank)+'</div></div>'
     +'<div class="saldo-item"><div class="saldo-item-label">Net Bulan Ini</div><div class="saldo-item-value">'+(m.net>=0?'+':'')+fmtShort(m.net)+'</div></div>'
+    +'</div>'
+    +'<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between;align-items:center">'
+    +'<div style="font-size:10px;opacity:.6">🏦 Net Worth (Saldo + Aset − Utang)</div>'
+    +'<div style="font-size:16px;font-weight:800;color:'+(netWorth>=0?'#A5D6A7':'#FFCDD2')+'">'+fmt(netWorth)+'</div>'
     +'</div></div>';
 
   // Payday button
@@ -740,7 +794,22 @@ function vCashFlow(){
   return h;
 }
 
-function getCatEmoji(cat){var m={'Rumah Tangga':'🏠','Transportasi':'🚗','Belanja':'🛒','Listrik':'⚡','Wifi':'📶','Anak':'👶','Istri':'💁','Kesehatan':'🏥','Makanan':'🍽️','Cicilan':'💳','Tabungan':'🏦','Gaji':'💼','Bonus':'💰','Utang Baru':'⚠️','Lain-lain':'📦'};return m[cat]||'📦';}
+function getCatEmoji(cat){
+  var exact={'Rumah Tangga':'🏠','Transportasi':'🚗','Belanja RT':'🛒','Belanja':'🛒','Listrik':'⚡','Wifi':'📶','Anak':'👶','Istri':'💁','Kesehatan':'🏥','Makanan':'🍽️','Cicilan':'💳','Tabungan':'🏦','Gaji':'💼','Bonus':'💰','Utang Baru':'⚠️','Lain-lain':'📦','Hiburan':'🎮','Pendidikan':'📚','Bensin':'⛽','BPJS':'🏥','Penjualan Aset':'💰','Tagihan Bulanan':'📅','Kredit':'💳'};
+  if(exact[cat]) return exact[cat];
+  var lc=(cat||'').toLowerCase();
+  if(lc.includes('hci')||lc.includes('kredit')||lc.includes('cicilan')) return '💳';
+  if(lc.includes('listrik')) return '⚡';
+  if(lc.includes('wifi')||lc.includes('internet')||lc.includes('telp')) return '📶';
+  if(lc.includes('bpjs')||lc.includes('sehat')) return '🏥';
+  if(lc.includes('bensin')||lc.includes('bbm')||lc.includes('transport')) return '⛽';
+  if(lc.includes('belanja')||lc.includes('rumah')) return '🛒';
+  if(lc.includes('tabungan')||lc.includes('nabung')) return '🏦';
+  if(lc.includes('gaji')||lc.includes('salary')) return '💼';
+  if(lc.includes('makan')) return '🍽️';
+  if(lc.includes('anak')||lc.includes('anak')) return '👶';
+  return '📦';
+}
 
 // ── BUDGET ────────────────────────────────────────────
 function vBudget(){
@@ -748,7 +817,10 @@ function vBudget(){
   var month=thisMonth();
   var tx=loadTx().filter(function(t){return t.date.startsWith(month)&&t.type==='expense';});
   
-  var h='<span class="slbl">Budget '+new Date().toLocaleDateString('id-ID',{month:'long',year:'numeric'})+'</span>';
+  var h='<div style="background:var(--grn-l);border:1px solid var(--grn-b);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:11.5px;color:var(--grn-d);line-height:1.6">'
+    +'💡 <strong>Cara kerja:</strong> Saat tambah transaksi, pilih <em>Pos Budget</em> dari dropdown. Progress bar di sini akan otomatis terisi sesuai yang sudah dikeluarkan.'
+    +'</div>';
+  h+='<span class="slbl">Budget '+new Date().toLocaleDateString('id-ID',{month:'long',year:'numeric'})+'</span>';
   budgets.forEach(function(b){
     var spent=tx.filter(function(t){return t.category===b.name||t.subcategory===b.name;}).reduce(function(s,t){return s+t.amount;},0);
     var pct=b.amount>0?Math.min(100,Math.round(spent/b.amount*100)):0;
@@ -756,8 +828,10 @@ function vBudget(){
     var paid=pct>=100;
     h+='<div class="budget-item"><div class="budget-row">'
       +'<div class="budget-name">'+esc(b.name)+'</div>'
+      +'<div style="display:flex;align-items:center;gap:5px">'
       +'<span class="badge '+(paid?'badge-grn':'badge-red')+'">'+(paid?'✅ Terpenuhi':'⏳ '+pct+'% terpakai')+'</span>'
-      +'</div>'
+      +'<button onclick="editBudget(\''+b.id+'\')" style="border:none;background:none;font-size:14px;cursor:pointer;padding:2px">✏️</button>'
+      +'</div></div>'
       +'<div class="prog"><div class="prog-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
       +'<div class="budget-numbers">'+fmt(spent)+' / '+fmt(b.amount)+(b.due_day?' · Tgl '+b.due_day:'')+'</div></div>';
   });
@@ -819,12 +893,15 @@ function vTarget(){
     }
     var monthly_needed=months_left&&months_left>0?Math.ceil(sisa/months_left):null;
     
-    h+='<div class="target-card">'
+  h+='<div class="target-card">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
       +'<div><div style="font-size:14px;font-weight:700">'+esc(t.name)+'</div>'
       +'<div style="font-size:11px;color:var(--mut)">Target: '+fmt(t.target)+'</div></div>'
-      +'<div style="text-align:right"><div style="font-size:18px;font-weight:800;color:var(--gld-d)">'+pct+'%</div></div>'
-      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:4px">'
+      +'<div style="font-size:18px;font-weight:800;color:var(--gld-d)">'+pct+'%</div>'
+      +'<button onclick="openEditTarget(\''+t.id+'\')" style="border:none;background:none;font-size:15px;cursor:pointer;padding:2px">✏️</button>'
+      +'<button onclick="deleteTarget(\''+t.id+'\')" style="border:none;background:none;font-size:15px;cursor:pointer;padding:2px">🗑️</button>'
+      +'</div></div>'
       +'<div class="prog" style="height:10px"><div class="prog-fill" style="width:'+pct+'%;background:linear-gradient(90deg,var(--gld),var(--grn))"></div></div>'
       +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:5px">'
       +'<span>Terkumpul: '+fmt(t.saved||0)+'</span><span>Sisa: '+fmt(sisa)+'</span></div>'
@@ -1015,29 +1092,41 @@ function renderCharts(){
 function vAset(){
   var assets=loadAssets();
   var debt=calcTotalDebt();
-  var totalAsset=assets.reduce(function(s,a){return s+a.value;},0);
+  var totalAsset=assets.reduce(function(s,a){return s+(a.value||0);},0);
   var netWorth=totalAsset-debt;
-  
+  var saldo=calcTotalSaldo();
+  var totalKekayaan=saldo.total+totalAsset;
+
   var h='<div class="networth-card">'
-    +'<div style="font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Net Worth (Aset − Utang)</div>'
+    +'<div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Total Kekayaan Bersih</div>'
     +'<div style="font-size:26px;font-weight:800;color:'+(netWorth>=0?'#A5D6A7':'#FFCDD2')+'">'+fmt(netWorth)+'</div>'
-    +'<div style="display:flex;gap:16px;margin-top:10px;font-size:11px;opacity:.7">'
-    +'<span>Total Aset: '+fmt(totalAsset)+'</span><span>Total Utang: '+fmt(debt)+'</span>'
-    +'</div></div>';
-  
-  h+='<button class="btn btn-grn btn-block" onclick="openAddAsset()" style="margin-bottom:12px">＋ Tambah Aset</button>';
-  
-  if(!assets.length){return h+'<div class="empty"><div class="empty-ico">🏦</div><div class="empty-txt">Belum ada aset tercatat.</div></div>';}
-  
+    +'<div style="display:flex;gap:12px;margin-top:8px;font-size:10.5px;opacity:.7;flex-wrap:wrap">'
+    +'<span>💰 Saldo: '+fmtShort(saldo.total)+'</span>'
+    +'<span>🏦 Aset: '+fmtShort(totalAsset)+'</span>'
+    +'<span>💳 Utang: '+fmtShort(debt)+'</span>'
+    +'</div>'
+    +'<div style="font-size:10px;opacity:.5;margin-top:4px">Net Worth = Saldo + Aset − Utang</div>'
+    +'</div>';
+
+  h+='<button class="btn btn-grn btn-block" onclick="openAddAset()" style="margin-bottom:12px">＋ Tambah Aset</button>';
+
+  if(!assets.length){return h+'<div class="empty"><div class="empty-ico">🏦</div><div class="empty-txt">Belum ada aset. Tambahkan kendaraan, elektronik, emas, dll.</div></div>';}
+
   var groups={};
   assets.forEach(function(a){groups[a.category]=groups[a.category]||[];groups[a.category].push(a);});
-  
+
   Object.keys(groups).forEach(function(cat){
-    var catTotal=groups[cat].reduce(function(s,a){return s+a.value;},0);
-    h+='<span class="slbl">'+cat+' — '+fmt(catTotal)+'</span>'
+    var catTotal=groups[cat].reduce(function(s,a){return s+(a.value||0);},0);
+    h+='<span class="slbl">'+esc(cat)+' — '+fmt(catTotal)+'</span>'
       +'<div class="card"><div class="card-body">';
     groups[cat].forEach(function(a){
-      h+='<div class="aset-item"><span class="aset-name">'+esc(a.name)+'</span><span class="aset-val">'+fmt(a.value)+'</span></div>';
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)">'
+        +'<div style="flex:1"><div class="aset-name">'+esc(a.name)+'</div></div>'
+        +'<div class="aset-val">'+fmt(a.value||0)+'</div>'
+        +'<button onclick="openEditAset(\''+a.id+'\')" style="border:none;background:none;font-size:15px;cursor:pointer;padding:2px">✏️</button>'
+        +'<button onclick="openJualAset(\''+a.id+'\')" style="border:none;background:none;font-size:15px;cursor:pointer;padding:2px" title="Jual/Likuidasi">💰</button>'
+        +'<button onclick="deleteAset(\''+a.id+'\')" style="border:none;background:none;font-size:15px;cursor:pointer;padding:2px">🗑️</button>'
+        +'</div>';
     });
     h+='</div></div>';
   });
@@ -1169,14 +1258,23 @@ function toggleBillPaid(id){
   var month=thisMonth();
   var idx=bill.paid_months.indexOf(month);
   if(idx>=0){
-    // Batalkan pelunasan
+    // Batalkan — hapus juga transaksinya dari Kas
     bill.paid_months.splice(idx,1);
+    var cleaned=loadTx().filter(function(t){
+      return!(t.date.startsWith(month)&&t.category===bill.name&&t.subcategory==='Tagihan Bulanan');
+    });
+    save(KS.tx,cleaned);
   } else {
-    // Tandai lunas + catat otomatis sebagai transaksi pengeluaran
+    // Tandai lunas — cek dulu agar tidak double
     bill.paid_months.push(month);
     var tx=loadTx();
-    tx.push({id:uid(),date:today(),type:'expense',category:bill.name,subcategory:'Tagihan Bulanan',amount:bill.amount,method:'transfer',note:'Bayar tagihan '+bill.name});
-    save(KS.tx,tx);
+    var sudahAda=tx.some(function(t){
+      return t.date.startsWith(month)&&t.category===bill.name&&t.subcategory==='Tagihan Bulanan';
+    });
+    if(!sudahAda){
+      tx.push({id:uid(),date:today(),type:'expense',category:bill.name,subcategory:'Tagihan Bulanan',amount:bill.amount,method:'transfer',note:'Bayar tagihan '+bill.name});
+      save(KS.tx,tx);
+    }
   }
   save(KS.bills,bills);render();
 }
@@ -1227,8 +1325,23 @@ function setTxType(type){
   ST.txType=type;
   document.getElementById('type-expense').classList.toggle('active',type==='expense');
   document.getElementById('type-income').classList.toggle('active',type==='income');
-  var cats=type==='income'?TX_CATS_INC:TX_CATS_EXP;
-  document.getElementById('tx-cat').innerHTML=cats.map(function(c){return'<option>'+c+'</option>';}).join('');
+  var catEl=document.getElementById('tx-cat');
+  if(type==='income'){
+    catEl.innerHTML=TX_CATS_INC.map(function(c){return'<option>'+c+'</option>';}).join('');
+  } else {
+    // Expense: tampilkan budget items dulu supaya auto-match dengan progress bar
+    var budgets=loadBudgets();
+    var budgetOpts=budgets.map(function(b){
+      return'<option value="'+esc(b.name)+'" data-budget="1">'+esc(b.name)+'</option>';
+    }).join('');
+    var extraCats=['Anak','Istri','Kesehatan','Makanan','Pendidikan','Hiburan','Lain-lain'];
+    catEl.innerHTML='<optgroup label="── Pos Budget (otomatis masuk progress)">'
+      +budgetOpts
+      +'</optgroup>'
+      +'<optgroup label="── Di Luar Budget">'
+      +extraCats.map(function(c){return'<option>'+c+'</option>';}).join('')
+      +'</optgroup>';
+  }
 }
 
 function saveTx(){
@@ -1285,13 +1398,48 @@ function saveDebtPayment(){
   closeModal('modal-pay-debt');render();
 }
 
+function editBudget(id){
+  var budgets=loadBudgets();
+  var b=budgets.find(function(x){return x.id===id;});
+  if(!b)return;
+  var newAmt=prompt('Ubah budget "'+b.name+'" (sekarang: '+fmt(b.amount)+'):',b.amount);
+  if(!newAmt||isNaN(+newAmt))return;
+  var idx=budgets.findIndex(function(x){return x.id===id;});
+  if(idx>=0){budgets[idx].amount=+newAmt;save(KS.budgets,budgets);render();}
+}
+
 // ── TARGET ACTIONS ────────────────────────────────────
+function openEditTarget(id){
+  var t=loadTargets().find(function(x){return x.id===id;});
+  if(!t)return;
+  document.getElementById('tgt-id').value=id;
+  document.getElementById('modal-tgt-title'||'modal-target-title').textContent='Edit Target';
+  document.getElementById('tgt-name').value=t.name;
+  document.getElementById('tgt-target').value=fmtI(t.target);
+  document.getElementById('tgt-saved').value=fmtI(t.saved||0);
+  document.getElementById('tgt-deadline').value=t.deadline||'';
+  openModal('modal-target');
+}
+
+function deleteTarget(id){
+  if(!confirm('Hapus target ini?'))return;
+  save(KS.targets,loadTargets().filter(function(t){return t.id!==id;}));render();
+}
+
 function saveTarget(){
   var name=document.getElementById('tgt-name').value.trim();
-  var target=+document.getElementById('tgt-target').value;
+  var target=parseI('tgt-target');
   if(!name||!target){alert('Isi nama dan target!');return;}
   var targets=loadTargets();
-  targets.push({id:uid(),name:name,target:target,saved:+document.getElementById('tgt-saved').value||0,deadline:document.getElementById('tgt-deadline').value});
+  var existId=document.getElementById('tgt-id').value;
+  if(existId){
+    var idx=targets.findIndex(function(t){return t.id===existId;});
+    if(idx>=0){targets[idx].name=name;targets[idx].target=target;targets[idx].saved=parseI('tgt-saved');targets[idx].deadline=document.getElementById('tgt-deadline').value;}
+  } else {
+    targets.push({id:uid(),name:name,target:target,saved:parseI('tgt-saved'),deadline:document.getElementById('tgt-deadline').value});
+  }
+  // Reset id
+  document.getElementById('tgt-id').value='';
   save(KS.targets,targets);closeModal('modal-target');render();
 }
 
@@ -1331,38 +1479,104 @@ function deleteWish(id){if(!confirm('Hapus wishlist ini?'))return;var w=loadWish
 // ── PAYDAY ────────────────────────────────────────────
 function updatePaydayAlloc(){
   var amount=+document.getElementById('payday-amount').value||0;
-  if(!amount){document.getElementById('payday-allocation').textContent='Masukkan nominal untuk lihat alokasi otomatis.';return;}
-  var debts=loadTotalDebt();
-  var targets=loadTargets();
-  var d1=Math.round(amount*0.4),em=Math.round(amount*0.2),sav=Math.round(amount*0.15),free=amount-d1-em-sav;
-  document.getElementById('payday-allocation').innerHTML='<strong>Alokasi Otomatis:</strong><br>💳 Cicilan Utang: '+fmt(d1)+'<br>🛡️ Dana Darurat: '+fmt(em)+'<br>🏦 Tabungan: '+fmt(sav)+'<br>💰 Bebas: '+fmt(free);
+  if(!amount){document.getElementById('payday-allocation').textContent='Masukkan nominal untuk lihat rencana alokasi.';return;}
+  var budgets=loadBudgets();
+  var groups={cicilan:'Cicilan / Hutang',utilities:'Tagihan & Utilitas',transport:'Transportasi',household:'Rumah Tangga',savings:'Tabungan',other:'Lainnya'};
+  var grouped={};
+  budgets.forEach(function(b){var k=b.cat||'other';grouped[k]=(grouped[k]||0)+b.amount;});
+  var totalBudget=budgets.reduce(function(s,b){return s+b.amount;},0);
+  var sisa=Math.max(0,amount-totalBudget);
+  var html='<div style="background:var(--grn-l);border:1px solid var(--grn-b);border-radius:10px;padding:12px;font-size:12px;line-height:2">';
+  Object.keys(grouped).forEach(function(k){
+    html+='<div style="display:flex;justify-content:space-between"><span>'+(groups[k]||k)+'</span><span style="font-weight:700">'+fmt(grouped[k])+'</span></div>';
+  });
+  html+='<div style="display:flex;justify-content:space-between;border-top:1px solid var(--grn-b);margin-top:4px;padding-top:4px;font-weight:700"><span>Total Budget</span><span>'+fmt(totalBudget)+'</span></div>';
+  html+='<div style="display:flex;justify-content:space-between;color:'+(sisa>0?'var(--grn-d)':'var(--red)')+';font-weight:700"><span>💰 Sisa Bebas</span><span>'+(sisa>0?fmt(sisa):'KURANG '+fmt(totalBudget-amount))+'</span></div>';
+  html+='</div>';
+  document.getElementById('payday-allocation').innerHTML=html;
 }
-
-function loadTotalDebt(){return calcTotalDebt();}
 
 function execPayday(){
   var amount=+document.getElementById('payday-amount').value;
   if(!amount){alert('Masukkan nominal gaji!');return;}
   var tx=loadTx();
   tx.push({id:uid(),date:today(),type:'income',category:'Gaji',amount:amount,method:'transfer',note:'Terima Gaji'});
-  // Auto-update cash
-  var st=loadSettings();
-  st.bank+=amount;
-  save(KS.settings,st);
-  save(KS.tx,tx);
+  var st=loadSettings();st.bank+=amount;
+  save(KS.settings,st);save(KS.tx,tx);
   closeModal('modal-payday');
-  alert('✅ Gaji '+fmt(amount)+' sudah dicatat!\n\nSaran alokasi:\n💳 Cicilan: '+fmt(Math.round(amount*0.4))+'\n🛡️ Dana Darurat: '+fmt(Math.round(amount*0.2))+'\n🏦 Tabungan: '+fmt(Math.round(amount*0.15))+'\n💰 Bebas: '+fmt(Math.round(amount*0.25)));
+  var budgets=loadBudgets();
+  var totalBudget=budgets.reduce(function(s,b){return s+b.amount;},0);
+  var sisa=Math.max(0,amount-totalBudget);
+  alert('✅ Gaji '+fmt(amount)+' tercatat!\n\nAlokasi berdasarkan Budget:\nTotal budget: '+fmt(totalBudget)+'\nSisa bebas: '+fmt(sisa)+'\n\nCek tab Budget untuk detail per pos.');
   render();
 }
 
-// ── ASSET ACTIONS ─────────────────────────────────────
-function openAddAsset(){
-  var name=prompt('Nama Aset:');if(!name)return;
-  var cat=prompt('Kategori (Kendaraan/Elektronik/Emas/Tabungan/Properti/Lain-lain):','Elektronik');if(!cat)return;
-  var val=prompt('Nilai Aset (Rp):');if(!val||isNaN(+val))return;
+// ── ASET FUNCTIONS ────────────────────────────────────
+function openAddAset(){
+  document.getElementById('aset-id').value='';
+  document.getElementById('modal-aset-title').textContent='Tambah Aset';
+  document.getElementById('aset-name').value='';
+  document.getElementById('aset-value').value='';
+  document.getElementById('aset-cat').value='Elektronik';
+  openModal('modal-aset');
+}
+
+function openEditAset(id){
+  var a=loadAssets().find(function(x){return x.id===id;});
+  if(!a)return;
+  document.getElementById('aset-id').value=id;
+  document.getElementById('modal-aset-title').textContent='Edit Aset';
+  document.getElementById('aset-name').value=a.name;
+  document.getElementById('aset-value').value=fmtI(a.value||0);
+  document.getElementById('aset-cat').value=a.category||'Lain-lain';
+  openModal('modal-aset');
+}
+
+function saveAset(){
+  var name=document.getElementById('aset-name').value.trim();
+  var value=parseI('aset-value');
+  var cat=document.getElementById('aset-cat').value;
+  if(!name||!value){alert('Isi nama dan nilai aset!');return;}
   var assets=loadAssets();
-  assets.push({id:uid(),name:name.trim(),category:cat.trim(),value:+val});
-  save(KS.assets,assets);render();
+  var existId=document.getElementById('aset-id').value;
+  if(existId){
+    var idx=assets.findIndex(function(a){return a.id===existId;});
+    if(idx>=0){assets[idx].name=name;assets[idx].value=value;assets[idx].category=cat;}
+  } else {
+    assets.push({id:uid(),name:name,category:cat,value:value});
+  }
+  save(KS.assets,assets);closeModal('modal-aset');render();
+}
+
+function deleteAset(id){
+  if(!confirm('Hapus aset ini dari daftar?'))return;
+  save(KS.assets,loadAssets().filter(function(a){return a.id!==id;}));render();
+}
+
+function openJualAset(id){
+  var a=loadAssets().find(function(x){return x.id===id;});
+  if(!a)return;
+  document.getElementById('jual-id').value=id;
+  document.getElementById('jual-title').textContent='Jual / Likuidasi — '+a.name;
+  document.getElementById('jual-amount').value=fmtI(a.value||0);
+  document.getElementById('jual-note').value='';
+  openModal('modal-jual-aset');
+}
+
+function execJualAset(){
+  var id=document.getElementById('jual-id').value;
+  var amount=parseI('jual-amount');
+  var note=document.getElementById('jual-note').value;
+  var a=loadAssets().find(function(x){return x.id===id;});
+  if(!a||!amount){alert('Isi harga jual!');return;}
+  // Record as income
+  var tx=loadTx();
+  tx.push({id:uid(),date:today(),type:'income',category:'Penjualan Aset',subcategory:a.name,amount:amount,method:'transfer',note:note||'Jual '+a.name});
+  save(KS.tx,tx);
+  // Remove asset
+  save(KS.assets,loadAssets().filter(function(x){return x.id!==id;}));
+  closeModal('modal-jual-aset');render();
+  alert('✅ '+a.name+' dijual '+fmt(amount)+' — tercatat sebagai pemasukan di tab Kas.');
 }
 
 // ── AI CHAT ───────────────────────────────────────────
@@ -1588,6 +1802,21 @@ document.addEventListener('input',function(e){
   }catch(e){}
 })();
 
+// Budget hint on category select
+document.addEventListener('change',function(e){
+  if(e.target.id!=='tx-cat')return;
+  var hint=document.getElementById('tx-budget-hint');
+  var nameEl=document.getElementById('tx-budget-name');
+  if(!hint||!nameEl)return;
+  var sel=e.target.selectedOptions[0];
+  if(sel&&sel.dataset.budget==='1'){
+    nameEl.textContent=sel.value;
+    hint.style.display='block';
+  } else {
+    hint.style.display='none';
+  }
+});
+
 // ── SERVICE WORKER ────────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
@@ -1632,6 +1861,31 @@ function showSWBanner(newSW) {
   };
 }
 
+// ── MIGRASI: remapping kategori lama → nama budget ────
+// Jalankan sekali — pemetaan manual generic → nama budget default
+function migrateOldCategories(){
+  var migrated=load('kf_migrated_v1',false);
+  if(migrated)return;
+  var MAP={
+    'Cicilan':null,           // ambiguous — skip
+    'Rumah Tangga':'Belanja RT',
+    'Listrik':'Listrik',
+    'Wifi':'Wifi',
+    'Transportasi':'Bensin',
+    'Tabungan':'Tabungan RT',
+  };
+  var tx=loadTx();
+  var changed=false;
+  tx.forEach(function(t){
+    if(t.type==='expense'&&MAP[t.category]!==undefined&&MAP[t.category]!==null){
+      t.category=MAP[t.category];
+      changed=true;
+    }
+  });
+  if(changed)save(KS.tx,tx);
+  save('kf_migrated_v1',true);
+}
+
 // ── INIT ──────────────────────────────────────────────
 // Set default tx date
 document.getElementById('tx-date').value=today();
@@ -1640,6 +1894,8 @@ document.getElementById('tgt-deadline').value=new Date(new Date().setFullYear(ne
 
 // Init category options
 setTxType('expense');
+// Migrate old generic categories to budget names (runs once)
+migrateOldCategories();
 render();
 </script>
 </body>
