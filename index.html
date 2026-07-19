@@ -390,7 +390,38 @@ body{font-family:var(--font);background:var(--bg);color:var(--txt);height:100dvh
 </div>
 
 <!-- MODAL JUAL / LIKUIDASI ASET -->
-<div class="modal-ovl" id="modal-jual-aset">
+<!-- ADD/EDIT ASET MODAL -->
+<div class="modal-ovl" id="modal-aset">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hd"><div class="modal-title" id="modal-aset-title">Tambah Aset</div><button class="modal-close" data-close="modal-aset">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="aset-id">
+      <div class="fg"><label class="flbl">Nama Aset</label><input class="finp" id="aset-name" placeholder="Laptop, Motor, Emas 5gr, dll..."></div>
+      <div class="form-grid">
+        <div class="fg"><label class="flbl">Kategori</label>
+          <select class="fsel" id="aset-cat">
+            <option value="Elektronik">📱 Elektronik</option>
+            <option value="Kendaraan">🚗 Kendaraan</option>
+            <option value="Emas">✨ Emas</option>
+            <option value="Properti">🏠 Properti</option>
+            <option value="Tabungan">🏦 Tabungan</option>
+            <option value="Investasi">📈 Investasi</option>
+            <option value="Lain-lain">📦 Lain-lain</option>
+          </select>
+        </div>
+        <div class="fg"><label class="flbl">Nilai (Rp)</label>
+          <input class="finp" type="text" inputmode="numeric" id="aset-value" placeholder="0"
+            onfocus="this.value=this.value.replace(/\./g,'')"
+            onblur="this.value=parseInt(this.value.replace(/\./g,'')||0).toLocaleString('id-ID')">
+        </div>
+      </div>
+      <button class="btn btn-grn btn-block" onclick="saveAset()">Simpan Aset</button>
+    </div>
+  </div>
+</div>
+
+<!-- JUAL / LIKUIDASI ASET MODAL -->
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-hd"><div class="modal-title" id="modal-jual-title">Jual Aset</div><button class="modal-close" data-close="modal-jual-aset">×</button></div>
