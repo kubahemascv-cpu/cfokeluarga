@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <title>Keluarga Finance</title>
-<meta name="theme-color" id="tc" content="#1B5E20">
+<meta name="theme-color" id="tc" content="#0B3D91">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="KF Dashboard">
 <link rel="apple-touch-icon" id="pwa-icon-link">
@@ -568,7 +568,114 @@ var KS={
 };
 
 function load(key,def){try{var v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
-function save(key,val){localStorage.setItem(key,JSON.stringify(val));}
+function save(key,val){localStorage.setItem(key,JSON.stringify(val));scheduleSync();}
+
+// ── CLOUD BACKUP (Google Sheets via Apps Script) ───────
+// localStorage tetap sumber utama (cepat, offline). Setiap save()
+// otomatis nge-trigger sync ke cloud (debounced). Kalau localStorage
+// kosong pas app dibuka (HP di-reset/clear data), app nawarin pulihin
+// otomatis dari cloud.
+var CLOUD_URL_KEY='kf_cloud_url', CLOUD_TOKEN_KEY='kf_cloud_token', CLOUD_LAST_KEY='kf_cloud_last_sync';
+function getCloudUrl(){return localStorage.getItem(CLOUD_URL_KEY)||'';}
+function getCloudToken(){return localStorage.getItem(CLOUD_TOKEN_KEY)||'';}
+function setCloudUrl(v){localStorage.setItem(CLOUD_URL_KEY,v||'');}
+function setCloudToken(v){localStorage.setItem(CLOUD_TOKEN_KEY,v||'');}
+function setCloudLastSync(ts){localStorage.setItem(CLOUD_LAST_KEY,ts);}
+function getCloudLastSync(){return localStorage.getItem(CLOUD_LAST_KEY)||'';}
+function getDeviceId(){
+  var id=localStorage.getItem('kf_device_id');
+  if(!id){id='hp-'+Math.random().toString(36).slice(2,8);localStorage.setItem('kf_device_id',id);}
+  return id;
+}
+function collectAllData(){
+  return {settings:loadSettings(),tx:loadTx(),debts:loadDebts(),targets:loadTargets(),
+    budgets:loadBudgets(),bills:loadBills(),assets:loadAssets(),wishlist:loadWish()};
+}
+function applyCloudData_(d){
+  if(d.settings)localStorage.setItem(KS.settings,JSON.stringify(d.settings));
+  if(d.tx)localStorage.setItem(KS.tx,JSON.stringify(d.tx));
+  if(d.debts)localStorage.setItem(KS.debts,JSON.stringify(d.debts));
+  if(d.targets)localStorage.setItem(KS.targets,JSON.stringify(d.targets));
+  if(d.budgets)localStorage.setItem(KS.budgets,JSON.stringify(d.budgets));
+  if(d.bills)localStorage.setItem(KS.bills,JSON.stringify(d.bills));
+  if(d.assets)localStorage.setItem(KS.assets,JSON.stringify(d.assets));
+  if(d.wishlist)localStorage.setItem(KS.wishlist,JSON.stringify(d.wishlist));
+}
+var _syncTimer=null;
+function scheduleSync(){
+  if(!getCloudUrl())return;
+  if(_syncTimer)clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(function(){syncToCloud(false);},3000);
+}
+function syncToCloud(manual){
+  var url=getCloudUrl();
+  if(!url){if(manual)alert('Isi dulu Apps Script URL di Cloud Backup.');return;}
+  var payload={token:getCloudToken(),device:getDeviceId(),data:collectAllData()};
+  fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res.ok){
+        setCloudLastSync(new Date().toISOString());
+        if(manual){alert('✅ Backup ke cloud berhasil.');if(ST.tab==='settings')render();}
+      }else if(manual){alert('❌ Gagal backup: '+(res.error||'unknown error'));}
+    })
+    .catch(function(err){if(manual)alert('❌ Gagal konek ke cloud: '+err);});
+}
+function restoreFromCloud(manual){
+  var url=getCloudUrl();
+  if(!url){if(manual)alert('Isi dulu Apps Script URL di Cloud Backup.');return;}
+  fetch(url+'?token='+encodeURIComponent(getCloudToken()))
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(!res.ok){if(manual)alert('❌ '+(res.error||'Gagal ambil backup dari cloud.'));return;}
+      var doApply=function(){
+        applyCloudData_(res.data);
+        setCloudLastSync(res.timestamp);
+        render();
+        alert('✅ Data dipulihkan dari cloud (backup: '+new Date(res.timestamp).toLocaleString('id-ID')+')');
+      };
+      if(manual){
+        if(confirm('Timpa data di HP ini dengan backup cloud tanggal '+new Date(res.timestamp).toLocaleString('id-ID')+'?\n\nData yang sekarang ada di HP akan diganti.'))doApply();
+      }else{doApply();}
+    })
+    .catch(function(err){if(manual)alert('❌ Gagal konek ke cloud: '+err);});
+}
+// Dipanggil sekali saat app boot. Kalau localStorage kosong (device abis
+// clear/reset/ganti HP) tapi cloud sudah dikonfigurasi → tawarkan restore.
+function checkAndRestoreOnBoot(){
+  var url=getCloudUrl();
+  if(!url)return;
+  var hasLocalData=loadTx().length>0||load(KS.settings,null)!==null;
+  if(hasLocalData)return;
+  fetch(url+'?token='+encodeURIComponent(getCloudToken()))
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(!res.ok)return;
+      if(confirm('Data di HP ini kosong, tapi ada backup di cloud (tanggal '+new Date(res.timestamp).toLocaleString('id-ID')+').\n\nPulihkan sekarang?')){
+        applyCloudData_(res.data);
+        setCloudLastSync(res.timestamp);
+        render();
+      }
+    })
+    .catch(function(){});
+}
+function importDataFile(input){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var d=JSON.parse(e.target.result);
+      if(!confirm('Timpa semua data di HP ini dengan isi file backup ini?'))return;
+      applyCloudData_(d);
+      render();
+      scheduleSync();
+      alert('✅ Data berhasil dipulihkan dari file backup.');
+    }catch(err){alert('❌ File tidak valid atau rusak: '+err);}
+    input.value='';
+  };
+  reader.readAsText(file);
+}
 
 // ── DEFAULT DATA ───────────────────────────────────────
 var DEF_SETTINGS={family:'Keluarga Bahagia',income:5000000,payday:25,emergency_target:15000000,cash:500000,bank:2000000};
@@ -1302,21 +1409,50 @@ function vSettings(){
     +'<div class="fg"><label class="flbl">Target Dana Darurat</label><input class="finp" type="text" inputmode="numeric" id="set-emergency" value="'+fmtV(st.emergency_target)+'" onfocus="this.value=this.value.replace(/\\./g,\'\')" onblur="this.value=parseInt(this.value.replace(/\\./g,\'\')||0).toLocaleString(\'id-ID\')"></div>'
     +'<button class="btn btn-grn btn-block" onclick="saveSettings()">Simpan Pengaturan</button>'
     +'</div></div>';
-  h+='<span class="slbl">Wishlist 🛒</span><div class="card"><div class="card-body">'
+  h+='<span class="slbl">🤖 AI Advisor — API Key</span><div class="card"><div class="card-body">'
+    +'<div style="background:var(--blue-l);border:1px solid #90CAF9;border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:11.5px;color:#1565C0;line-height:1.6">'
+    +'Fitur AI Advisor &amp; Decision Center membutuhkan Anthropic API Key. Daftar gratis di <strong>console.anthropic.com</strong> → API Keys → Create Key. Key disimpan hanya di HP ini.'
+    +'</div>'
+    +'<div class="fg"><label class="flbl">Anthropic API Key</label>'
+    +'<input class="finp" type="password" id="set-apikey" value="'+esc(getApiKey())+'" placeholder="sk-ant-api03-...">'
+    +'</div>'
+    +(getApiKey()?'<div style="font-size:11px;color:var(--grn);margin-bottom:10px">✅ API Key sudah tersimpan — AI Advisor aktif</div>':'<div style="font-size:11px;color:var(--red);margin-bottom:10px">❌ Belum ada API Key — AI Advisor tidak bisa digunakan</div>')
+    +'<button class="btn btn-grn btn-block" onclick="saveApiKey()">Simpan API Key</button>'
+    +'</div></div>';
     +'<button class="btn btn-out btn-block btn-sm" onclick="openModal(\'modal-wish\')" style="margin-bottom:10px">＋ Tambah Wishlist</button>'
     +renderWishlist()+'</div></div>';
-  h+='<span class="slbl">Export Data</span><div class="card"><div class="card-body">'
+  var cUrl=getCloudUrl(),cLast=getCloudLastSync();
+  h+='<span class="slbl">☁️ Cloud Backup (Google Sheets)</span><div class="card"><div class="card-body">'
+    +'<div style="background:var(--blue-l);border:1px solid #90CAF9;border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:11.5px;color:#1565C0;line-height:1.6">'
+    +'Setiap ada perubahan data, app otomatis kirim backup ke Google Sheets. Kalau HP di-reset/clear data, data bisa dipulihkan dari sini.'
+    +'</div>'
+    +'<div class="fg"><label class="flbl">Apps Script URL</label><input class="finp" type="text" id="set-cloud-url" value="'+esc(cUrl)+'" placeholder="https://script.google.com/macros/s/xxx/exec"></div>'
+    +'<div class="fg"><label class="flbl">Token</label><input class="finp" type="password" id="set-cloud-token" value="'+esc(getCloudToken())+'" placeholder="samakan dengan TOKEN di Apps Script"></div>'
+    +(cUrl?('<div style="font-size:11px;color:'+(cLast?'var(--grn)':'var(--red)')+';margin-bottom:10px">'+(cLast?'✅ Sync terakhir: '+new Date(cLast).toLocaleString('id-ID'):'⚠️ Belum pernah sync')+'</div>'):'<div style="font-size:11px;color:var(--red);margin-bottom:10px">❌ Cloud Backup belum diaktifkan</div>')
+    +'<button class="btn btn-grn btn-block" onclick="saveCloudSettings()" style="margin-bottom:8px">Simpan Pengaturan Cloud</button>'
+    +'<button class="btn btn-out btn-block" onclick="syncToCloud(true)" style="margin-bottom:8px">🔄 Sync Sekarang</button>'
+    +'<button class="btn btn-out btn-block" onclick="restoreFromCloud(true)">⬇️ Pulihkan dari Cloud</button>'
+    +'</div></div>';
+  h+='<span class="slbl">Export &amp; Import Data</span><div class="card"><div class="card-body">'
     +'<div style="font-size:11.5px;color:var(--mut);margin-bottom:10px;line-height:1.6">File CSV bisa dibuka di <strong>Microsoft Excel</strong> atau di-import ke <strong>Google Sheets</strong>.</div>'
     +'<button class="btn btn-grn btn-block" onclick="exportCSV_tx()" style="margin-bottom:8px">📊 Export Transaksi (CSV)</button>'
     +'<button class="btn btn-grn btn-block" onclick="exportCSV_budget()" style="margin-bottom:8px">📊 Export Budget Report (CSV)</button>'
     +'<button class="btn btn-grn btn-block" onclick="exportCSV_debt()" style="margin-bottom:8px">📊 Export Utang (CSV)</button>'
     +'<button class="btn btn-out btn-block" onclick="exportData()" style="margin-bottom:8px">📤 Backup Lengkap (JSON)</button>'
+    +'<label class="btn btn-out btn-block" style="margin-bottom:8px;display:block;text-align:center;cursor:pointer">📥 Restore dari File Backup (JSON)<input type="file" accept="application/json" style="display:none" onchange="importDataFile(this)"></label>'
     +'<div style="height:1px;background:var(--bdr);margin:12px 0"></div>'
     +'<div style="font-size:11px;color:var(--mut);margin-bottom:8px;font-weight:600">⚠️ ZONA BAHAYA</div>'
     +'<button class="btn btn-block" style="background:#FFF3E0;color:#E65100;border:1.5px solid #FFCC80;margin-bottom:8px" onclick="resetTransaksi()">🗑️ Hapus Semua Transaksi (Kas saja)</button>'
     +'<button class="btn btn-red btn-block btn-sm" onclick="resetData()">💥 Reset Seluruh App (Hapus Semua Data)</button>'
     +'</div></div>';
   return h;
+}
+function saveCloudSettings(){
+  var url=document.getElementById('set-cloud-url').value.trim();
+  var token=document.getElementById('set-cloud-token').value.trim();
+  setCloudUrl(url);setCloudToken(token);
+  alert('✅ Pengaturan Cloud Backup tersimpan.');
+  render();
 }
 
 // ── RENDER ENGINE ─────────────────────────────────────
@@ -1718,22 +1854,52 @@ function deleteBudget(id){
   save(KS.budgets,loadBudgets().filter(function(x){return x.id!==id;}));renderInPlace();
 }
 
+// ── API KEY ───────────────────────────────────────────
+function getApiKey(){return localStorage.getItem('kf_apikey')||'';}
+function saveApiKey(){
+  var key=document.getElementById('set-apikey').value.trim();
+  if(key&&!key.startsWith('sk-')){alert('Format API Key tidak valid. Harus dimulai dengan sk-');return;}
+  if(key){localStorage.setItem('kf_apikey',key);alert('✅ API Key tersimpan! AI Advisor sekarang aktif.');}
+  else{localStorage.removeItem('kf_apikey');alert('API Key dihapus.');}
+  render();
+}
+
+function checkApiKey(){
+  if(!getApiKey()){
+    alert('❌ API Key belum diset.\n\nBuka tab ⚙️ Setting → AI Advisor → masukkan Anthropic API Key.\n\nDapat key gratis di: console.anthropic.com');
+    return false;
+  }
+  return true;
+}
+
+function getAIHeaders(){
+  return{
+    'Content-Type':'application/json',
+    'x-api-key':getApiKey(),
+    'anthropic-version':'2023-06-01',
+    'anthropic-dangerous-direct-browser-access':'true'
+  };
+}
+
 // ── AI CHAT ───────────────────────────────────────────
 function clearChat(){if(!confirm('Hapus riwayat chat?'))return;save(KS.chatHistory,[]);render();}
 
 async function sendChat(){
   var inp=document.getElementById('chat-inp');
-  var msg=inp.value.trim();if(!msg)return;inp.value='';
+  var msg=inp.value.trim();if(!msg)return;
+  if(!checkApiKey())return;
+  inp.value='';
   var chat=loadChat();chat.push({role:'user',content:msg});save(KS.chatHistory,chat);render();
   var ms=document.getElementById('main-scroll');ms.scrollTop=ms.scrollHeight;
   var msgs=document.getElementById('chat-messages');
   if(msgs)msgs.innerHTML+='<div class="chat-msg ai loading">Menganalisis... ⏳</div>';
   try{
-    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:'Kamu adalah Financial Advisor profesional untuk keluarga Indonesia. Berikan saran keuangan yang praktis dan actionable dalam Bahasa Indonesia yang hangat.\n\nData keuangan keluarga:\n'+buildAIContext(),messages:chat.map(function(m){return{role:m.role,content:m.content};})})});
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:getAIHeaders(),body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:'Kamu adalah Financial Advisor profesional untuk keluarga Indonesia. Berikan saran keuangan yang praktis dan actionable dalam Bahasa Indonesia yang hangat.\n\nData keuangan keluarga:\n'+buildAIContext(),messages:chat.map(function(m){return{role:m.role,content:m.content};})})});
     var data=await resp.json();
+    if(data.error){throw new Error(data.error.message||'API error');}
     var reply=data.content&&data.content[0]?data.content[0].text:'Maaf, tidak dapat memproses saat ini.';
     chat.push({role:'assistant',content:reply});save(KS.chatHistory,chat);
-  }catch(e){chat.push({role:'assistant',content:'Maaf, terjadi kesalahan koneksi. Coba lagi.'});save(KS.chatHistory,chat);}
+  }catch(e){chat.push({role:'assistant',content:'❌ Error: '+e.message+'\n\nCek API Key di tab ⚙️ Setting.'});save(KS.chatHistory,chat);}
   render();setTimeout(function(){var ms=document.getElementById('main-scroll');ms.scrollTop=ms.scrollHeight;},100);
 }
 
@@ -1798,7 +1964,7 @@ function updateIco(dark){
 
 // ── DATA UTILITIES ────────────────────────────────────
 function exportData(){
-  var data={settings:loadSettings(),tx:loadTx(),debts:loadDebts(),targets:loadTargets(),budgets:loadBudgets(),assets:loadAssets(),wishlist:loadWish()};
+  var data=collectAllData();
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='keluarga-finance-backup-'+today()+'.json';a.click();
 }
@@ -1848,10 +2014,10 @@ document.addEventListener('input',function(e){
   var cv=document.createElement('canvas');cv.width=512;cv.height=512;
   var ctx=cv.getContext('2d');
 
-  // Orange gradient background
+  // Blue gradient background
   var g=ctx.createLinearGradient(0,0,512,512);
-  g.addColorStop(0,'#FF7A2F');
-  g.addColorStop(1,'#C43E08');
+  g.addColorStop(0,'#2F80ED');
+  g.addColorStop(1,'#0B3D91');
 
   // Rounded rectangle
   var r=110;
@@ -1886,7 +2052,7 @@ document.addEventListener('input',function(e){
   var png=cv.toDataURL('image/png');
   var il=document.getElementById('pwa-icon-link');if(il){il.rel='apple-touch-icon';il.href=png;}
   try{
-    var m={name:'CFO Keluarga Finance',short_name:'CFO',description:'Financial Advisor Keluarga',start_url:'./',display:'standalone',background_color:'#FFF5F0',theme_color:'#C43E08',icons:[{src:png,sizes:'192x192',type:'image/png'},{src:png,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
+    var m={name:'CFO Keluarga Finance',short_name:'CFO',description:'Financial Advisor Keluarga',start_url:'./',display:'standalone',background_color:'#EAF2FE',theme_color:'#0B3D91',icons:[{src:png,sizes:'192x192',type:'image/png'},{src:png,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
     var bl=new Blob([JSON.stringify(m)],{type:'application/json'});
     document.getElementById('pwa-manifest').href=URL.createObjectURL(bl);
   }catch(e){}
@@ -1987,6 +2153,8 @@ setTxType('expense');
 // Migrate old generic categories to budget names (runs once)
 migrateOldCategories();
 render();
+// Cek apakah data lokal kosong (habis clear cache/reset HP) dan ada cloud backup
+checkAndRestoreOnBoot();
 </script>
 </body>
 </html>
