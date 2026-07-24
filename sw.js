@@ -4,12 +4,12 @@
 // - Tidak hilang saat HP di-update
 // - Bisa dibuka offline (cached)
 
-var CACHE = 'cs-tukin-v1';
+var CACHE = 'cs-tukin-v2';
 
 self.addEventListener('install', function(e){
   e.waitUntil(
     caches.open(CACHE).then(function(c){
-      return c.addAll(['./']);
+      return c.addAll(['./','manifest.json','icon-192.png','icon-512.png']);
     }).catch(function(){})
   );
   self.skipWaiting();

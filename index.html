@@ -7,8 +7,8 @@
 <meta name="theme-color" id="tc" content="#0B3D91">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="KF Dashboard">
-<link rel="apple-touch-icon" id="pwa-icon-link">
-<link rel="manifest" id="pwa-manifest">
+<link rel="apple-touch-icon" id="pwa-icon-link" href="icon-192.png">
+<link rel="manifest" id="pwa-manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -2026,53 +2026,11 @@ document.addEventListener('input',function(e){
 });
 
 // ── PWA ───────────────────────────────────────────────
-(function(){
-  var cv=document.createElement('canvas');cv.width=512;cv.height=512;
-  var ctx=cv.getContext('2d');
-
-  // Blue gradient background
-  var g=ctx.createLinearGradient(0,0,512,512);
-  g.addColorStop(0,'#2F80ED');
-  g.addColorStop(1,'#0B3D91');
-
-  // Rounded rectangle
-  var r=110;
-  ctx.beginPath();ctx.moveTo(r,0);ctx.arcTo(512,0,512,r,r);ctx.arcTo(512,512,512-r,512,r);ctx.arcTo(0,512,0,512-r,r);ctx.arcTo(0,0,r,0,r);ctx.closePath();
-  ctx.fillStyle=g;ctx.fill();
-
-  // Depth overlay
-  var ig=ctx.createRadialGradient(160,140,10,256,256,380);
-  ig.addColorStop(0,'rgba(255,255,255,0.15)');ig.addColorStop(1,'rgba(0,0,0,0.15)');
-  ctx.fillStyle=ig;ctx.fill();
-
-  // "CFO" — white, bold, centered
-  ctx.fillStyle='#FFFFFF';
-  ctx.textAlign='center';ctx.textBaseline='alphabetic';
-  ctx.font='900 210px Arial';
-  ctx.fillText('CFO',256,310);
-
-  // Thin divider
-  ctx.fillStyle='rgba(255,255,255,0.3)';
-  ctx.fillRect(80,335,352,3);
-
-  // Subtitle "Keluarga Finance" spaced manually
-  ctx.fillStyle='rgba(255,255,255,0.75)';
-  ctx.font='600 46px Arial';
-  var letters=['K','e','l','u','a','r','g','a',' ','F','i','n','a','n','c','e'];
-  var gap=5,tw=0;
-  var ws=letters.map(function(l){var w=ctx.measureText(l).width;tw+=w;return w;});
-  tw+=gap*(letters.length-1);
-  var cx=256-tw/2;ctx.textAlign='left';
-  letters.forEach(function(l,i){ctx.fillText(l,cx,405);cx+=ws[i]+gap;});
-
-  var png=cv.toDataURL('image/png');
-  var il=document.getElementById('pwa-icon-link');if(il){il.rel='apple-touch-icon';il.href=png;}
-  try{
-    var m={name:'CFO Keluarga Finance',short_name:'CFO',description:'Financial Advisor Keluarga',start_url:'./',display:'standalone',background_color:'#EAF2FE',theme_color:'#0B3D91',icons:[{src:png,sizes:'192x192',type:'image/png'},{src:png,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
-    var bl=new Blob([JSON.stringify(m)],{type:'application/json'});
-    document.getElementById('pwa-manifest').href=URL.createObjectURL(bl);
-  }catch(e){}
-})();
+// Icon (icon-192.png, icon-512.png) dan manifest.json sekarang file
+// statis di folder yang sama, bukan digambar ulang tiap app dibuka.
+// Ini bikin proses install jadi app (WebAPK) lebih stabil di Android.
+// Link <link rel="manifest"> dan <link rel="apple-touch-icon"> di
+// bagian <head> sudah langsung nunjuk ke file-file itu.
 
 // Budget hint on category select
 document.addEventListener('change',function(e){
